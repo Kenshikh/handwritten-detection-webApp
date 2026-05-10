@@ -445,31 +445,6 @@ st.markdown(
             width: 100%;
         }
 
-        .section-card-title {
-            font-family: 'Manrope', sans-serif;
-            font-size: 1.05rem;
-            font-weight: 800;
-            color: var(--text);
-            margin-bottom: 0.2rem;
-        }
-
-        .section-card-copy {
-            color: var(--muted);
-            font-size: 0.92rem;
-            line-height: 1.6;
-            margin-bottom: 0.85rem;
-        }
-
-        .empty-state {
-            background: linear-gradient(135deg, #fbfcff 0%, #f4f7fd 100%);
-            border: 1px dashed #cfd9ea;
-            border-radius: 18px;
-            padding: 1rem 1.05rem;
-            color: var(--muted);
-            line-height: 1.6;
-            font-size: 0.95rem;
-        }
-
         .dash-stat {
             padding: 1.15rem 1.2rem;
             min-height: 128px;
@@ -829,7 +804,7 @@ def render_stat_card(label, value, change, dot_color, change_color):
 
 
 def render_empty_state(message):
-    st.markdown(f'<div class="empty-state">{html.escape(message)}</div>', unsafe_allow_html=True)
+    st.info(message)
 
 
 def build_chart_data(data):
@@ -899,30 +874,25 @@ def render_dashboard_page():
 
         left_col, right_col = st.columns([1.2, 1])
         with left_col:
-            with st.container(border=True):
-                st.markdown('<div class="section-card-title">OCR Processing Volume</div>', unsafe_allow_html=True)
-                chart_df = build_chart_data(data)
-                if not chart_df.empty:
-                    st.markdown(
-                        '<div class="section-card-copy">The chart adapts to available OCR records and updates automatically as new files are processed.</div>',
-                        unsafe_allow_html=True,
-                    )
-                    st.line_chart(chart_df, height=280, use_container_width=True)
-                else:
-                    render_empty_state("No processing data yet. Run OCR once and the chart will appear here.")
+            st.markdown("### OCR Processing Volume")
+            chart_df = build_chart_data(data)
+            if not chart_df.empty:
+                st.caption("The chart adapts to available OCR records and updates automatically as new files are processed.")
+                st.line_chart(chart_df, height=280, use_container_width=True)
+            else:
+                render_empty_state("No processing data yet. Run OCR once and the chart will appear here.")
 
         with right_col:
-            with st.container(border=True):
-                st.markdown('<div class="section-card-title">Recent Documents</div>', unsafe_allow_html=True)
-                if data["recent_documents"]:
-                    docs_df = pd.DataFrame(
-                        data["recent_documents"],
-                        columns=["document", "size", "status", "processed_time"],
-                    )
-                    docs_df.columns = ["Document", "Size", "Status", "Processed Time"]
-                    st.dataframe(docs_df, use_container_width=True, hide_index=True)
-                else:
-                    render_empty_state("No documents processed yet.")
+            st.markdown("### Recent Documents")
+            if data["recent_documents"]:
+                docs_df = pd.DataFrame(
+                    data["recent_documents"],
+                    columns=["document", "size", "status", "processed_time"],
+                )
+                docs_df.columns = ["Document", "Size", "Status", "Processed Time"]
+                st.dataframe(docs_df, use_container_width=True, hide_index=True)
+            else:
+                render_empty_state("No documents processed yet.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 
