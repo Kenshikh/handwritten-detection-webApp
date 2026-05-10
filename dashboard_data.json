@@ -1,0 +1,15 @@
+{
+  "stats": {
+    "processed_docs": 0,
+    "successful_ocr": 0,
+    "errors": 0,
+    "active_users": 0,
+    "processed_change": "0%",
+    "successful_change": "0%",
+    "errors_change": "0%",
+    "active_change": "0%"
+  },
+  "volume": [],
+  "recent_documents": [],
+  "recent_activity": []
+}
