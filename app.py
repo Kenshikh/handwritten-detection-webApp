@@ -1,14 +1,17 @@
 """
 Handwritten Character Recognition - Streamlit App
-Professional two-step UI for college project presentation
+Dashboard plus OCR workspace for college project presentation
 """
 
 import base64
 import html
 import io
+import json
 import os
 from datetime import datetime
+from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 from groq import Groq
 from PIL import Image
@@ -22,22 +25,28 @@ st.set_page_config(
 )
 
 
+DATA_FILE = Path("dashboard_data.json")
+
+
 st.markdown(
     """
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap');
 
         :root {
             --bg: #f4f7fb;
             --surface: #ffffff;
             --surface-soft: #eef3f9;
+            --surface-strong: #f8fbff;
             --text: #14213d;
             --muted: #5c6b82;
             --line: #d9e2ef;
-            --primary: #0f4c81;
-            --primary-strong: #08365c;
-            --accent: #e7f0fa;
-            --success: #1f7a5c;
+            --primary: #3a34c8;
+            --primary-strong: #2921a5;
+            --accent: #eeedff;
+            --success: #1f9a62;
+            --warning: #d09b24;
+            --danger: #d5585f;
             --shadow: 0 18px 48px rgba(15, 36, 66, 0.10);
             --radius: 22px;
         }
@@ -49,15 +58,15 @@ st.markdown(
 
         .stApp {
             background:
-                radial-gradient(circle at top left, rgba(77, 145, 214, 0.14), transparent 28%),
+                radial-gradient(circle at top left, rgba(99, 102, 241, 0.12), transparent 26%),
                 radial-gradient(circle at top right, rgba(15, 76, 129, 0.09), transparent 22%),
-                linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+                linear-gradient(180deg, #fafbff 0%, var(--bg) 100%);
         }
 
         .block-container {
-            max-width: 1180px;
-            padding-top: 2.2rem;
-            padding-bottom: 2rem;
+            max-width: 1220px;
+            padding-top: 1.8rem;
+            padding-bottom: 2.25rem;
         }
 
         #MainMenu, footer, header {
@@ -82,12 +91,12 @@ st.markdown(
             border: 1.5px dashed #a9bdd7 !important;
             border-radius: 18px !important;
             padding: 1rem;
-            margin-top: 1.1rem;
+            margin-top: 1rem;
         }
 
         [data-testid="stFileUploader"]:hover {
             border-color: var(--primary) !important;
-            background: #f4f8fd;
+            background: #f4f5ff;
         }
 
         .stButton > button,
@@ -102,7 +111,7 @@ st.markdown(
         }
 
         .stButton > button {
-            background: linear-gradient(135deg, var(--primary) 0%, #1b6ca8 100%) !important;
+            background: linear-gradient(135deg, var(--primary) 0%, #5d56ea 100%) !important;
             color: white !important;
         }
 
@@ -115,7 +124,7 @@ st.markdown(
         .stDownloadButton > button {
             background: white !important;
             color: var(--primary-strong) !important;
-            border: 1px solid #bdd0e3 !important;
+            border: 1px solid #d7d4ff !important;
         }
 
         .nav-bar {
@@ -123,12 +132,12 @@ st.markdown(
             justify-content: space-between;
             align-items: center;
             gap: 1rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         .brand {
             font-family: 'Manrope', sans-serif;
-            font-size: 1.05rem;
+            font-size: 1.08rem;
             font-weight: 800;
             letter-spacing: -0.02em;
             color: var(--primary-strong);
@@ -140,15 +149,16 @@ st.markdown(
         }
 
         .hero-card {
-            background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(237,244,252,0.96));
-            border: 1px solid rgba(181, 200, 222, 0.7);
+            background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,239,255,0.98));
+            border: 1px solid #e1e4fb;
             border-radius: 30px;
-            padding: 2.5rem;
+            padding: 2.8rem 2.6rem;
             box-shadow: var(--shadow);
             overflow: hidden;
             position: relative;
             max-width: 860px;
-            margin: 3rem auto 0;
+            margin: 3.4rem auto 0;
+            text-align: center;
         }
 
         .hero-card::after {
@@ -157,7 +167,7 @@ st.markdown(
             inset: auto -60px -80px auto;
             width: 230px;
             height: 230px;
-            background: radial-gradient(circle, rgba(15, 76, 129, 0.10), transparent 70%);
+            background: radial-gradient(circle, rgba(58, 52, 200, 0.14), transparent 70%);
         }
 
         .eyebrow {
@@ -177,61 +187,8 @@ st.markdown(
             line-height: 1.08;
             font-weight: 800;
             letter-spacing: -0.04em;
-            margin: 0;
+            margin: 0 auto;
             max-width: 720px;
-        }
-
-        .hero-copy {
-            font-size: 1.1rem;
-            color: var(--muted);
-            line-height: 1.8;
-            max-width: 700px;
-            margin-top: 1rem;
-        }
-
-        .info-card, .feature-card, .upload-card, .result-card {
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            padding: 1.35rem;
-            box-shadow: 0 8px 24px rgba(16, 39, 71, 0.05);
-        }
-
-        .card-title {
-            font-family: 'Manrope', sans-serif;
-            font-size: 1.08rem;
-            font-weight: 800;
-            margin-bottom: 0.55rem;
-        }
-
-        .card-copy {
-            color: var(--muted);
-            line-height: 1.7;
-            font-size: 0.99rem;
-        }
-
-        .result-text {
-            background: #f8fbff;
-            border: 1px solid #dbe5f0;
-            border-radius: 16px;
-            padding: 1rem 1.1rem;
-            line-height: 1.7;
-            white-space: pre-wrap;
-            color: var(--text);
-            min-height: 130px;
-        }
-
-        .steps-list {
-            margin: 0;
-            padding-left: 1.15rem;
-            color: var(--muted);
-            line-height: 1.9;
-        }
-
-        .status-note {
-            font-size: 0.94rem;
-            color: var(--muted);
-            margin-top: 0.6rem;
         }
 
         .home-copy {
@@ -239,27 +196,92 @@ st.markdown(
             color: var(--muted);
             line-height: 1.9;
             font-size: 1.05rem;
-            margin-top: 1rem;
+            margin: 1rem auto 0;
         }
 
         .home-actions {
             max-width: 220px;
-            margin-top: 2rem;
+            margin: 2rem auto 0;
         }
 
-        .page-toolbar {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 1.25rem;
+        .workspace-shell {
+            margin-top: 0.35rem;
+        }
+
+        .side-nav {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 1rem;
+            box-shadow: 0 10px 30px rgba(15, 36, 66, 0.06);
+            position: sticky;
+            top: 1.25rem;
+        }
+
+        .side-nav-title {
+            font-family: 'Manrope', sans-serif;
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--primary-strong);
+            margin-bottom: 0.25rem;
+        }
+
+        .side-nav-copy {
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .side-nav .stButton {
+            margin-bottom: 0.7rem;
+        }
+
+        .side-nav .stButton:last-child {
+            margin-bottom: 0;
+        }
+
+        .side-nav .stButton > button {
+            background: #ffffff !important;
+            border: 1px solid #d9e2ef !important;
+            color: var(--text) !important;
+            box-shadow: none !important;
+        }
+
+        .side-nav .stButton > button:hover {
+            background: #f7f9fd !important;
+            filter: none !important;
+        }
+
+        .page-shell {
+            max-width: 100%;
+            margin: 0;
+        }
+
+        .upload-card,
+        .result-card,
+        .dash-card,
+        .toolbar-card,
+        .activity-card {
+            background: rgba(255, 255, 255, 0.97);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: 0 8px 24px rgba(16, 39, 71, 0.05);
+        }
+
+        .toolbar-card {
+            padding: 1rem 1.1rem;
+            margin-bottom: 1.15rem;
         }
 
         .upload-card {
-            max-width: 760px;
+            max-width: 980px;
             margin: 0 auto;
-            padding: 1.75rem;
+            padding: 1.85rem;
         }
 
-        .upload-card-title {
+        .upload-card-title,
+        .section-title {
             font-family: 'Manrope', sans-serif;
             font-size: 2rem;
             font-weight: 800;
@@ -267,11 +289,29 @@ st.markdown(
             margin-bottom: 0.45rem;
         }
 
-        .upload-card-copy {
+        .section-title {
+            font-size: 1.15rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .upload-card-copy,
+        .card-copy,
+        .status-note,
+        .dashboard-copy {
             color: var(--muted);
             line-height: 1.7;
-            font-size: 1rem;
-            margin-bottom: 1.25rem;
+        }
+
+        .dashboard-head {
+            margin-bottom: 1rem;
+        }
+
+        .dashboard-title {
+            font-family: 'Manrope', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.25rem;
         }
 
         .upload-tips {
@@ -279,6 +319,7 @@ st.markdown(
             flex-wrap: wrap;
             gap: 0.6rem;
             margin-top: 1rem;
+            margin-bottom: 0.35rem;
         }
 
         .tip-pill {
@@ -288,6 +329,14 @@ st.markdown(
             padding: 0.45rem 0.8rem;
             color: var(--muted);
             font-size: 0.92rem;
+        }
+
+        .preview-frame {
+            background: var(--surface-strong);
+            border: 1px solid #dbe5f0;
+            border-radius: 18px;
+            padding: 0.9rem;
+            margin-top: 1rem;
         }
 
         .notice-card {
@@ -310,13 +359,123 @@ st.markdown(
         }
 
         .result-wrap {
-            max-width: 760px;
+            max-width: 980px;
             margin: 1.5rem auto 0;
+        }
+
+        .result-card,
+        .dash-card,
+        .activity-card {
+            padding: 1.25rem;
+        }
+
+        .result-text {
+            background: #f8fbff;
+            border: 1px solid #dbe5f0;
+            border-radius: 16px;
+            padding: 1rem 1.1rem;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            color: var(--text);
+            min-height: 130px;
+        }
+
+        .metric-strip {
+            margin-top: 1rem;
+            margin-bottom: 0.6rem;
+        }
+
+        [data-testid="stMetric"] {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 0.85rem 1rem;
+            box-shadow: 0 8px 24px rgba(16, 39, 71, 0.04);
+        }
+
+        [data-testid="stMetricLabel"] {
+            color: var(--muted);
+        }
+
+        .result-actions {
+            margin-top: 1rem;
+        }
+
+        .result-actions .stButton,
+        .result-actions .stDownloadButton {
+            width: 100%;
+        }
+
+        .result-actions .stButton > button,
+        .result-actions .stDownloadButton > button {
+            width: 100%;
+        }
+
+        .dash-stat {
+            padding: 1.15rem 1.2rem;
+            min-height: 128px;
+        }
+
+        .dash-stat-top {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .dash-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .dash-label {
+            color: var(--muted);
+            font-size: 0.94rem;
+        }
+
+        .dash-value {
+            font-family: 'Manrope', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1;
+        }
+
+        .dash-change {
+            margin-top: 0.55rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        .activity-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.85rem 0;
+            border-bottom: 1px solid #edf1f7;
+        }
+
+        .activity-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .activity-time {
+            color: var(--muted);
+            white-space: nowrap;
         }
 
         @media (max-width: 900px) {
             .hero-card {
                 padding: 2rem 1.2rem;
+            }
+
+            .upload-card,
+            .result-wrap {
+                max-width: 100%;
             }
         }
     </style>
@@ -329,6 +488,74 @@ class Config:
     MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
     TEMPERATURE = 0.2
     MAX_TOKENS = 2048
+
+
+def default_dashboard_data():
+    return {
+        "stats": {
+            "processed_docs": 0,
+            "successful_ocr": 0,
+            "errors": 0,
+            "active_users": 0,
+            "processed_change": "0%",
+            "successful_change": "0%",
+            "errors_change": "0%",
+            "active_change": "0%",
+        },
+        "volume": [],
+        "recent_documents": [],
+        "recent_activity": [],
+    }
+
+
+def ensure_data_file():
+    if not DATA_FILE.exists():
+        DATA_FILE.write_text(json.dumps(default_dashboard_data(), indent=2), encoding="utf-8")
+
+
+def load_dashboard_data():
+    ensure_data_file()
+    try:
+        return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        data = default_dashboard_data()
+        DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return data
+
+
+def update_dashboard_after_run(file_name, file_size_bytes, status):
+    data = load_dashboard_data()
+    processed_time = datetime.now().strftime("%I:%M %p").lstrip("0")
+    size_label = f"{file_size_bytes / (1024 * 1024):.1f} MB"
+
+    data["recent_documents"].insert(
+        0,
+        {
+            "document": file_name,
+            "size": size_label,
+            "status": status,
+            "processed_time": processed_time,
+        },
+    )
+    data["recent_documents"] = data["recent_documents"][:6]
+
+    activity_message = f"Processed {file_name}" if status == "Completed" else f"OCR failed on {file_name}"
+    data["recent_activity"].insert(0, {"message": activity_message, "time": processed_time})
+    data["recent_activity"] = data["recent_activity"][:6]
+
+    data["stats"]["processed_docs"] += 1
+    if status == "Completed":
+        data["stats"]["successful_ocr"] += 1
+    else:
+        data["stats"]["errors"] += 1
+
+    day_key = datetime.now().strftime("%a")
+    for point in data["volume"]:
+        if point["day"] == day_key:
+            point["documents"] += 1
+            break
+
+    DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def encode_image_to_base64(image_bytes: bytes) -> str:
@@ -421,63 +648,18 @@ Current transcription:
     return completion.choices[0].message.content.strip()
 
 
-def reevaluate_with_user_feedback(client, image_bytes, generated_text, user_feedback, mime_type="image/jpeg"):
-    base64_image = encode_image_to_base64(image_bytes)
-
-    prompt = f"""You are reviewing a handwritten text transcription generated by an AI system.
-
-The user has indicated that the current transcription may contain an error.
-Use the handwritten image, the current transcription, and the user's feedback to produce the best corrected transcription.
-
-Instructions:
-1. Review the handwritten image carefully
-2. Compare it against the current transcription
-3. Consider the user's feedback about what may be incorrect
-4. Return only the corrected transcription
-5. Do not include explanations, labels, notes, or extra commentary
-
-Current transcription:
-{generated_text}
-
-User feedback:
-{user_feedback}
-"""
-
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": prompt},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime_type};base64,{base64_image}"},
-                },
-            ],
-        }
-    ]
-
-    completion = client.chat.completions.create(
-        model=Config.MODEL,
-        messages=messages,
-        temperature=0,
-        max_tokens=Config.MAX_TOKENS,
-        top_p=1,
-        stream=False,
-    )
-    return completion.choices[0].message.content.strip()
-
-
 def init_session_state():
-    if "page" not in st.session_state:
-        st.session_state.page = "home"
-    if "uploaded_image_bytes" not in st.session_state:
-        st.session_state.uploaded_image_bytes = None
-    if "uploaded_mime_type" not in st.session_state:
-        st.session_state.uploaded_mime_type = None
-    if "review_status" not in st.session_state:
-        st.session_state.review_status = None
-    if "review_feedback" not in st.session_state:
-        st.session_state.review_feedback = ""
+    defaults = {
+        "page": "home",
+        "uploaded_image_bytes": None,
+        "uploaded_mime_type": None,
+        "last_result": "",
+        "last_file": "",
+        "last_timestamp": "",
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
 def render_navbar():
@@ -516,15 +698,32 @@ def render_sidebar():
     return api_key_input, use_streaming
 
 
+def render_side_nav():
+    st.markdown('<div class="side-nav">', unsafe_allow_html=True)
+    st.markdown('<div class="side-nav-title">Navigation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="side-nav-copy">Switch between pages.</div>', unsafe_allow_html=True)
+    if st.button("Dashboard", key="side_dashboard", use_container_width=True):
+        st.session_state.page = "dashboard"
+        st.rerun()
+
+    if st.button("OCR Workspace", key="side_ocr", use_container_width=True):
+        st.session_state.page = "upload"
+        st.rerun()
+
+    if st.button("Home", key="side_home", use_container_width=True):
+        st.session_state.page = "home"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def render_home_page():
     st.markdown(
         """
         <div class="hero-card">
+            <div class="eyebrow">AI Vision Demo</div>
             <h1 class="hero-title">Handwriting Recognition System</h1>
             <div class="home-copy">
-                This project reads handwritten text from an uploaded image.
-                It uses an AI vision model to convert notes into digital text.
-                Click start to upload an image and generate the transcription.
+                Open a dashboard for presentation and keep a separate OCR workspace for uploading, transcribing, downloading, and re-checking handwritten text.
             </div>
         </div>
         """,
@@ -535,202 +734,267 @@ def render_home_page():
     with center_col:
         st.markdown('<div class="home-actions">', unsafe_allow_html=True)
         if st.button("Start", use_container_width=True):
-            st.session_state.page = "upload"
+            st.session_state.page = "dashboard"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_upload_page(api_key, use_streaming):
-    st.markdown('<div class="page-toolbar">', unsafe_allow_html=True)
-    left_spacer, toolbar_right = st.columns([4, 1])
-    with toolbar_right:
-        if st.button("Back to Home", use_container_width=True):
-            st.session_state.page = "home"
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
+def render_stat_card(label, value, change, dot_color, change_color):
     st.markdown(
-        """
-        <div class="upload-card">
-            <div class="upload-card-title">Upload Handwritten Image</div>
-            <div class="upload-card-copy">
-                Choose a clear handwritten image to extract and convert the text into digital format.
+        f"""
+        <div class="dash-card dash-stat">
+            <div class="dash-stat-top">
+                <span class="dash-dot" style="background:{dot_color};"></span>
+                <span class="dash-label">{html.escape(label)}</span>
             </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    uploaded_file = st.file_uploader(
-        "Choose an image file",
-        type=["jpg", "jpeg", "png", "bmp", "webp"],
-        help="Supported formats: JPG, JPEG, PNG, BMP, WEBP",
-        label_visibility="collapsed",
-    )
-
-    st.markdown(
-        """
-        <div class="upload-tips">
-            <span class="tip-pill">Good lighting</span>
-            <span class="tip-pill">Clear handwriting</span>
-            <span class="tip-pill">Plain background</span>
+            <div class="dash-value">{html.escape(value)}</div>
+            <div class="dash-change" style="color:{change_color};">{html.escape(change)} from last week</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    if uploaded_file:
-        image_bytes = uploaded_file.read()
-        mime_type = uploaded_file.type or "image/jpeg"
-        st.session_state["uploaded_image_bytes"] = image_bytes
-        st.session_state["uploaded_mime_type"] = mime_type
-        image = Image.open(io.BytesIO(image_bytes))
-        st.image(image, caption=uploaded_file.name, use_container_width=True)
 
-        if st.button("Run Recognition", use_container_width=True):
-            if not api_key:
-                st.error("Enter your Groq API key in the sidebar before running the model.")
+def render_activity(items):
+    rows = []
+    for item in items:
+        rows.append(
+            f"""
+            <div class="activity-row">
+                <div>{html.escape(item["message"])}</div>
+                <div class="activity-time">{html.escape(item["time"])}</div>
+            </div>
+            """
+        )
+    st.markdown("".join(rows), unsafe_allow_html=True)
+
+
+def render_dashboard_page():
+    data = load_dashboard_data()
+    stats = data["stats"]
+
+    nav_col, content_col = st.columns([0.9, 3.4], gap="large")
+    with nav_col:
+        render_side_nav()
+
+    with content_col:
+        st.markdown('<div class="workspace-shell">', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="dashboard-head">
+                <div class="dashboard-title">AI-OCR Dashboard</div>
+                <div class="dashboard-copy">Reference-style overview using your local JSON file for stats, chart data, recent documents, and activity.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        a, b, c = st.columns(3)
+        with a:
+            render_stat_card("Processed Docs", f"{stats['processed_docs']:,}", stats["processed_change"], "#c9f5db", "#1f9a62")
+        with b:
+            render_stat_card("Successful OCR", f"{stats['successful_ocr']:,}", stats["successful_change"], "#c9f5db", "#1f9a62")
+        with c:
+            render_stat_card("Errors", f"{stats['errors']:,}", stats["errors_change"], "#ffe2e4", "#d5585f")
+
+        left_col, right_col = st.columns([1.2, 1])
+        with left_col:
+            st.markdown("### OCR Processing Volume")
+            if data["volume"]:
+                chart_df = pd.DataFrame(data["volume"]).set_index("day")
+                st.line_chart(chart_df, height=280, use_container_width=True)
             else:
-                try:
-                    client = Groq(api_key=api_key)
-                    with st.spinner("Analyzing handwriting..."):
-                        if use_streaming:
-                            placeholder = st.empty()
-                            full_text = ""
-                            completion = recognize_text(client, image_bytes, mime_type, streaming=True)
-                            for chunk in completion:
-                                delta = chunk.choices[0].delta.content or ""
-                                full_text += delta
-                                safe_text = html.escape(full_text + "▌")
-                                placeholder.markdown(
-                                    f'<div class="result-text">{safe_text}</div>',
-                                    unsafe_allow_html=True,
-                                )
-                            placeholder.markdown(
-                                f'<div class="result-text">{html.escape(full_text)}</div>',
-                                unsafe_allow_html=True,
-                            )
-                        else:
-                            full_text = recognize_text(client, image_bytes, mime_type, streaming=False)
+                st.info("No processing data yet.")
 
-                    st.session_state["last_result"] = full_text
-                    st.session_state["last_file"] = uploaded_file.name
-                    st.session_state["last_timestamp"] = datetime.now().strftime("%H:%M:%S")
-                    st.session_state["review_status"] = None
-                    st.session_state["review_feedback"] = ""
-                    st.success("Transcription completed successfully.")
-                except Exception as exc:
-                    st.error(f"Recognition failed: {exc}")
-                    st.caption("Check the API key and verify the selected model is available.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    if st.session_state.get("last_result"):
-        result_text = st.session_state["last_result"]
-        word_count = len(result_text.split())
-        char_count = len(result_text)
-        timestamp = st.session_state.get("last_timestamp", "--:--:--")
-
-        st.markdown('<div class="result-wrap">', unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div class="result-card">
-                <div class="card-title">Transcription Result</div>
-                <div class="status-note">Generated text from the most recently processed image.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            """
-            <div class="notice-card">
-                <div class="notice-title">Disclaimer</div>
-                This transcription is generated by an AI system and should be reviewed before final use.
-                Although the model is designed to read handwriting accurately, it may occasionally
-                misinterpret words, characters, or formatting.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'<div class="result-text">{html.escape(result_text)}</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("#### Human Review")
-        st.caption("Please confirm whether the generated transcription is accurate before using it.")
-
-        review_col1, review_col2 = st.columns(2)
-        with review_col1:
-            if st.button("Mark as Correct", use_container_width=True):
-                st.session_state["review_status"] = "confirmed"
-                st.session_state["review_feedback"] = ""
-                st.rerun()
-        with review_col2:
-            if st.button("Report an Issue", use_container_width=True):
-                st.session_state["review_status"] = "needs_review"
-                st.rerun()
-
-        if st.session_state.get("review_status") == "confirmed":
-            st.success("User confirmation recorded: the transcription has been reviewed and marked as correct.")
-
-        if st.session_state.get("review_status") == "needs_review":
-            feedback = st.text_area(
-                "Describe the issue or provide the expected correction",
-                value=st.session_state.get("review_feedback", ""),
-                placeholder="Example: The second line should say 'department' instead of 'deportment'.",
-                height=110,
+        with right_col:
+            st.markdown("### Recent Documents")
+            docs_df = pd.DataFrame(
+                data["recent_documents"],
+                columns=["document", "size", "status", "processed_time"],
             )
-            st.session_state["review_feedback"] = feedback
+            docs_df.columns = ["Document", "Size", "Status", "Processed Time"]
+            st.dataframe(docs_df, use_container_width=True, hide_index=True)
 
-            if st.button("Re-validate with Feedback"):
-                if not api_key:
-                    st.error("Enter your Groq API key in the sidebar before running re-validation.")
-                elif not st.session_state.get("uploaded_image_bytes"):
-                    st.error("Please upload and process an image before re-validating the transcription.")
-                elif not feedback.strip():
-                    st.error("Please enter feedback so the system can re-check the transcription.")
-                else:
-                    try:
-                        client = Groq(api_key=api_key)
-                        with st.spinner("Re-validating transcription with user feedback..."):
-                            review_result = reevaluate_with_user_feedback(
-                                client,
-                                st.session_state["uploaded_image_bytes"],
-                                result_text,
-                                feedback.strip(),
-                                st.session_state.get("uploaded_mime_type", "image/jpeg"),
-                            )
-
-                        st.session_state["last_result"] = review_result
-                        st.session_state["last_timestamp"] = datetime.now().strftime("%H:%M:%S")
-                        st.session_state["review_status"] = "updated"
-                        st.session_state["review_feedback"] = ""
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Re-validation failed: {exc}")
-
-        if st.session_state.get("review_status") == "updated":
-            st.success("The transcription has been re-validated using the user's feedback.")
-
-        metric_a, metric_b, metric_c = st.columns(3)
-        metric_a.metric("Words", word_count)
-        metric_b.metric("Characters", char_count)
-        metric_c.metric("Processed At", timestamp)
-
-        st.download_button(
-            label="Download Transcription",
-            data=result_text,
-            file_name=f"transcription_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            mime="text/plain",
-            use_container_width=False,
-        )
+        st.markdown("### Recent Activity")
+        if data["recent_activity"]:
+            render_activity(data["recent_activity"])
+        else:
+            st.info("No recent activity yet.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 
+def render_upload_page(api_key, use_streaming):
+    nav_col, content_col = st.columns([0.9, 3.4], gap="large")
+    with nav_col:
+        render_side_nav()
+
+    with content_col:
+        st.markdown('<div class="workspace-shell">', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="upload-card">
+                <div class="upload-card-title">OCR Workspace</div>
+                <div class="upload-card-copy">
+                    Choose a clear handwritten image to extract and convert the text into digital format.
+                </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        uploaded_file = st.file_uploader(
+            "Choose an image file",
+            type=["jpg", "jpeg", "png", "bmp", "webp"],
+            help="Supported formats: JPG, JPEG, PNG, BMP, WEBP",
+            label_visibility="collapsed",
+        )
+
+        st.markdown(
+            """
+            <div class="upload-tips">
+                <span class="tip-pill">Good lighting</span>
+                <span class="tip-pill">Clear handwriting</span>
+                <span class="tip-pill">Plain background</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if uploaded_file:
+            image_bytes = uploaded_file.read()
+            mime_type = uploaded_file.type or "image/jpeg"
+            st.session_state["uploaded_image_bytes"] = image_bytes
+            st.session_state["uploaded_mime_type"] = mime_type
+
+            st.markdown('<div class="preview-frame">', unsafe_allow_html=True)
+            image = Image.open(io.BytesIO(image_bytes))
+            st.image(image, caption=uploaded_file.name, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            if st.button("Run Recognition", use_container_width=True):
+                if not api_key:
+                    st.error("Enter your Groq API key in the sidebar before running the model.")
+                else:
+                    try:
+                        client = Groq(api_key=api_key)
+                        with st.spinner("Analyzing handwriting..."):
+                            if use_streaming:
+                                placeholder = st.empty()
+                                full_text = ""
+                                completion = recognize_text(client, image_bytes, mime_type, streaming=True)
+                                for chunk in completion:
+                                    delta = chunk.choices[0].delta.content or ""
+                                    full_text += delta
+                                    safe_text = html.escape(full_text + "|")
+                                    placeholder.markdown(
+                                        f'<div class="result-text">{safe_text}</div>',
+                                        unsafe_allow_html=True,
+                                    )
+                                placeholder.markdown(
+                                    f'<div class="result-text">{html.escape(full_text)}</div>',
+                                    unsafe_allow_html=True,
+                                )
+                            else:
+                                full_text = recognize_text(client, image_bytes, mime_type, streaming=False)
+
+                        st.session_state["last_result"] = full_text
+                        st.session_state["last_file"] = uploaded_file.name
+                        st.session_state["last_timestamp"] = datetime.now().strftime("%H:%M:%S")
+                        update_dashboard_after_run(uploaded_file.name, len(image_bytes), "Completed")
+                        st.success("Transcription completed successfully.")
+                    except Exception as exc:
+                        update_dashboard_after_run(uploaded_file.name, len(image_bytes), "Error")
+                        st.error(f"Recognition failed: {exc}")
+                        st.caption("Check the API key and verify the selected model is available.")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if st.session_state.get("last_result"):
+            result_text = st.session_state["last_result"]
+            word_count = len(result_text.split())
+            char_count = len(result_text)
+            timestamp = st.session_state.get("last_timestamp", "--:--:--")
+
+            st.markdown('<div class="result-wrap">', unsafe_allow_html=True)
+            st.markdown(
+                """
+                <div class="result-card">
+                    <div class="section-title">Transcription Result</div>
+                    <div class="status-note">Generated text from the most recently processed image.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                """
+                <div class="notice-card">
+                    <div class="notice-title">Disclaimer</div>
+                    This transcription is generated by an AI system and should be reviewed before final use.
+                    Although the model is designed to read handwriting accurately, it may occasionally
+                    misinterpret words, characters, or formatting.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f'<div class="result-text">{html.escape(result_text)}</div>',
+                unsafe_allow_html=True,
+            )
+
+            st.markdown('<div class="metric-strip">', unsafe_allow_html=True)
+            metric_a, metric_b, metric_c = st.columns(3)
+            metric_a.metric("Words", word_count)
+            metric_b.metric("Characters", char_count)
+            metric_c.metric("Processed At", timestamp)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            st.markdown('<div class="result-actions">', unsafe_allow_html=True)
+            action_left, action_right = st.columns(2)
+            with action_left:
+                st.download_button(
+                    label="Download Transcription",
+                    data=result_text,
+                    file_name=f"transcription_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+            with action_right:
+                if st.button("Re-evaluate Transcription", use_container_width=True):
+                    if not api_key:
+                        st.error("Enter your Groq API key in the sidebar before running re-evaluation.")
+                    elif not st.session_state.get("uploaded_image_bytes"):
+                        st.error("Please upload and process an image before re-evaluating the transcription.")
+                    else:
+                        try:
+                            client = Groq(api_key=api_key)
+                            with st.spinner("Re-evaluating transcription..."):
+                                review_result = reevaluate_text(
+                                    client,
+                                    st.session_state["uploaded_image_bytes"],
+                                    result_text,
+                                    st.session_state.get("uploaded_mime_type", "image/jpeg"),
+                                )
+
+                            if review_result.strip() == "The transcription is correct.":
+                                st.info("Verification result: The transcription is correct.")
+                            else:
+                                st.session_state["last_result"] = review_result
+                                st.success("Verification result: The transcription was reviewed and corrected.")
+                                st.rerun()
+                        except Exception as exc:
+                            st.error(f"Re-evaluation failed: {exc}")
+            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+
 init_session_state()
+ensure_data_file()
 render_navbar()
 api_key_input, use_streaming = render_sidebar()
 api_key = api_key_input.strip() if api_key_input else os.environ.get("GROQ_API_KEY", "")
 
 if st.session_state.page == "home":
     render_home_page()
+elif st.session_state.page == "dashboard":
+    render_dashboard_page()
 else:
     render_upload_page(api_key, use_streaming)
