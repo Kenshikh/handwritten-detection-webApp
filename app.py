@@ -771,7 +771,7 @@ def render_home_page():
             <div class="eyebrow">AI Vision Demo</div>
             <h1 class="hero-title">Handwriting Recognition System</h1>
             <div class="home-copy">
-                Open a dashboard for presentation and keep a separate OCR workspace for uploading, transcribing, downloading, and re-checking handwritten text.
+                Advanced AI-powered handwriting recognition with real-time transcription, verification, and comprehensive analytics dashboard for your document processing workflow.
             </div>
         </div>
         """,
@@ -858,7 +858,7 @@ def render_dashboard_page():
             """
             <div class="dashboard-head">
                 <div class="dashboard-title">AI-OCR Dashboard</div>
-                <div class="dashboard-copy">Reference-style overview using your local JSON file for stats, chart data, recent documents, and activity.</div>
+                <div class="dashboard-copy">Real-time performance metrics, processing history, and activity tracking for your handwriting recognition operations.</div>
             </div>
             """,
             unsafe_allow_html=True,
