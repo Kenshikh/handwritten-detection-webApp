@@ -132,20 +132,40 @@ st.markdown(
             justify-content: space-between;
             align-items: center;
             gap: 1rem;
-            margin-bottom: 1.25rem;
+            margin-bottom: 1.4rem;
+            background: linear-gradient(135deg, #2f2ac0 0%, #4b46e3 100%);
+            border-radius: 28px;
+            padding: 1.2rem 1.4rem;
+            box-shadow: 0 16px 40px rgba(47, 42, 192, 0.20);
         }
 
         .brand {
             font-family: 'Manrope', sans-serif;
-            font-size: 1.08rem;
+            font-size: 1.35rem;
             font-weight: 800;
             letter-spacing: -0.02em;
-            color: var(--primary-strong);
+            color: #ffffff;
         }
 
         .brand-sub {
-            font-size: 0.9rem;
+            font-size: 0.98rem;
+            color: rgba(255, 255, 255, 0.84);
+        }
+
+        .side-brand {
+            font-family: 'Manrope', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--primary-strong);
+            line-height: 1.35;
+            margin-bottom: 0.35rem;
+        }
+
+        .side-brand-sub {
+            font-size: 0.95rem;
             color: var(--muted);
+            line-height: 1.7;
         }
 
         .hero-card {
@@ -208,14 +228,16 @@ st.markdown(
             margin-top: 0.35rem;
         }
 
-        .side-nav {
-            background: rgba(255, 255, 255, 0.92);
-            border: 1px solid var(--line);
-            border-radius: 24px;
-            padding: 1rem;
-            box-shadow: 0 10px 30px rgba(15, 36, 66, 0.06);
+        .side-panel {
             position: sticky;
-            top: 1.25rem;
+            top: 1.15rem;
+        }
+
+        .side-panel-copy {
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.55;
+            margin-bottom: 1.15rem;
         }
 
         .side-nav-title {
@@ -233,24 +255,36 @@ st.markdown(
             margin-bottom: 1rem;
         }
 
-        .side-nav .stButton {
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid var(--line) !important;
+            border-radius: 24px !important;
+            padding: 1.15rem !important;
+            box-shadow: 0 14px 36px rgba(15, 36, 66, 0.08);
+        }
+
+        .side-panel .stButton {
             margin-bottom: 0.7rem;
         }
 
-        .side-nav .stButton:last-child {
+        .side-panel .stButton:last-child {
             margin-bottom: 0;
         }
 
-        .side-nav .stButton > button {
+        .side-panel .stButton > button {
             background: #ffffff !important;
             border: 1px solid #d9e2ef !important;
             color: var(--text) !important;
             box-shadow: none !important;
         }
 
-        .side-nav .stButton > button:hover {
+        .side-panel .stButton > button:hover {
             background: #f7f9fd !important;
             filter: none !important;
+        }
+
+        .side-panel .stButton > button {
+            min-height: 3.1rem !important;
         }
 
         .page-shell {
@@ -699,21 +733,31 @@ def render_sidebar():
 
 
 def render_side_nav():
-    st.markdown('<div class="side-nav">', unsafe_allow_html=True)
-    st.markdown('<div class="side-nav-title">Navigation</div>', unsafe_allow_html=True)
-    st.markdown('<div class="side-nav-copy">Switch between pages.</div>', unsafe_allow_html=True)
-    if st.button("Dashboard", key="side_dashboard", use_container_width=True):
-        st.session_state.page = "dashboard"
-        st.rerun()
+    with st.container(border=True):
+        st.markdown('<div class="side-panel">', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="side-brand">Handwriting Recognition System</div>
+            <div class="side-brand-sub">AI-powered handwritten text transcription</div>
+            <div style="height: 1rem;"></div>
+            <div class="side-nav-title">Navigation</div>
+            <div class="side-panel-copy">Switch between pages.</div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if st.button("OCR Workspace", key="side_ocr", use_container_width=True):
-        st.session_state.page = "upload"
-        st.rerun()
+        if st.button("Dashboard", key="side_dashboard", use_container_width=True):
+            st.session_state.page = "dashboard"
+            st.rerun()
 
-    if st.button("Home", key="side_home", use_container_width=True):
-        st.session_state.page = "home"
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+        if st.button("OCR Workspace", key="side_ocr", use_container_width=True):
+            st.session_state.page = "upload"
+            st.rerun()
+
+        if st.button("Home", key="side_home", use_container_width=True):
+            st.session_state.page = "home"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_home_page():
@@ -988,9 +1032,9 @@ def render_upload_page(api_key, use_streaming):
 
 init_session_state()
 ensure_data_file()
-render_navbar()
 api_key_input, use_streaming = render_sidebar()
 api_key = api_key_input.strip() if api_key_input else os.environ.get("GROQ_API_KEY", "")
+render_navbar()
 
 if st.session_state.page == "home":
     render_home_page()
