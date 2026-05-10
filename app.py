@@ -445,6 +445,31 @@ st.markdown(
             width: 100%;
         }
 
+        .section-card-title {
+            font-family: 'Manrope', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 0.2rem;
+        }
+
+        .section-card-copy {
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.6;
+            margin-bottom: 0.85rem;
+        }
+
+        .empty-state {
+            background: linear-gradient(135deg, #fbfcff 0%, #f4f7fd 100%);
+            border: 1px dashed #cfd9ea;
+            border-radius: 18px;
+            padding: 1rem 1.05rem;
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
         .dash-stat {
             padding: 1.15rem 1.2rem;
             min-height: 128px;
@@ -559,6 +584,7 @@ def load_dashboard_data():
 
 def update_dashboard_after_run(file_name, file_size_bytes, status):
     data = load_dashboard_data()
+    processed_at = datetime.now()
     processed_time = datetime.now().strftime("%I:%M %p").lstrip("0")
     size_label = f"{file_size_bytes / (1024 * 1024):.1f} MB"
 
@@ -569,6 +595,7 @@ def update_dashboard_after_run(file_name, file_size_bytes, status):
             "size": size_label,
             "status": status,
             "processed_time": processed_time,
+            "processed_at": processed_at.isoformat(),
         },
     )
     data["recent_documents"] = data["recent_documents"][:6]
@@ -583,11 +610,13 @@ def update_dashboard_after_run(file_name, file_size_bytes, status):
     else:
         data["stats"]["errors"] += 1
 
-    day_key = datetime.now().strftime("%a")
+    day_key = processed_at.strftime("%a")
     for point in data["volume"]:
         if point["day"] == day_key:
             point["documents"] += 1
             break
+    else:
+        data["volume"].append({"day": day_key, "documents": 1})
 
     DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
@@ -799,18 +828,45 @@ def render_stat_card(label, value, change, dot_color, change_color):
     )
 
 
-def render_activity(items):
-    rows = []
-    for item in items:
-        rows.append(
-            f"""
-            <div class="activity-row">
-                <div>{html.escape(item["message"])}</div>
-                <div class="activity-time">{html.escape(item["time"])}</div>
-            </div>
-            """
-        )
-    st.markdown("".join(rows), unsafe_allow_html=True)
+def render_empty_state(message):
+    st.markdown(f'<div class="empty-state">{html.escape(message)}</div>', unsafe_allow_html=True)
+
+
+def build_chart_data(data):
+    if data["volume"]:
+        return pd.DataFrame(data["volume"]).set_index("day")
+
+    recent_documents = data.get("recent_documents", [])
+    if not recent_documents:
+        return pd.DataFrame()
+
+    dated_records = []
+    undated_count = 0
+    for item in reversed(recent_documents):
+        processed_at = item.get("processed_at")
+        if processed_at:
+            try:
+                stamp = datetime.fromisoformat(processed_at)
+                dated_records.append(stamp.strftime("%d %b"))
+                continue
+            except ValueError:
+                pass
+        undated_count += 1
+
+    if dated_records:
+        counts = {}
+        for label in dated_records:
+            counts[label] = counts.get(label, 0) + 1
+        return pd.DataFrame(
+            [{"day": key, "documents": value} for key, value in counts.items()]
+        ).set_index("day")
+
+    return pd.DataFrame(
+        [
+            {"day": f"Run {index + 1}", "documents": 1}
+            for index in range(undated_count)
+        ]
+    ).set_index("day")
 
 
 def render_dashboard_page():
@@ -843,27 +899,30 @@ def render_dashboard_page():
 
         left_col, right_col = st.columns([1.2, 1])
         with left_col:
-            st.markdown("### OCR Processing Volume")
-            if data["volume"]:
-                chart_df = pd.DataFrame(data["volume"]).set_index("day")
-                st.line_chart(chart_df, height=280, use_container_width=True)
-            else:
-                st.info("No processing data yet.")
+            with st.container(border=True):
+                st.markdown('<div class="section-card-title">OCR Processing Volume</div>', unsafe_allow_html=True)
+                chart_df = build_chart_data(data)
+                if not chart_df.empty:
+                    st.markdown(
+                        '<div class="section-card-copy">The chart adapts to available OCR records and updates automatically as new files are processed.</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.line_chart(chart_df, height=280, use_container_width=True)
+                else:
+                    render_empty_state("No processing data yet. Run OCR once and the chart will appear here.")
 
         with right_col:
-            st.markdown("### Recent Documents")
-            docs_df = pd.DataFrame(
-                data["recent_documents"],
-                columns=["document", "size", "status", "processed_time"],
-            )
-            docs_df.columns = ["Document", "Size", "Status", "Processed Time"]
-            st.dataframe(docs_df, use_container_width=True, hide_index=True)
-
-        st.markdown("### Recent Activity")
-        if data["recent_activity"]:
-            render_activity(data["recent_activity"])
-        else:
-            st.info("No recent activity yet.")
+            with st.container(border=True):
+                st.markdown('<div class="section-card-title">Recent Documents</div>', unsafe_allow_html=True)
+                if data["recent_documents"]:
+                    docs_df = pd.DataFrame(
+                        data["recent_documents"],
+                        columns=["document", "size", "status", "processed_time"],
+                    )
+                    docs_df.columns = ["Document", "Size", "Status", "Processed Time"]
+                    st.dataframe(docs_df, use_container_width=True, hide_index=True)
+                else:
+                    render_empty_state("No documents processed yet.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 
