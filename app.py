@@ -876,24 +876,21 @@ def render_navbar():
 def render_sidebar():
     with st.sidebar:
         st.markdown("### Configuration")
-        provider = st.selectbox("Provider", options=["Groq", "Gemini"], index=0)
+        provider = "Gemini"
         model = st.selectbox(
             "Model",
             options=PROVIDER_MODELS[provider],
             index=0,
             help="Choose the model used for OCR and re-evaluation.",
         )
-        api_label = "Groq API Key" if provider == "Groq" else "Gemini API Key"
-        api_placeholder = "gsk_..." if provider == "Groq" else "AIza..."
         api_key_input = st.text_input(
-            api_label,
+            "Gemini API Key",
             type="password",
-            placeholder=api_placeholder,
-            help="Use your provider API key for the selected model.",
+            placeholder="AIza...",
+            help="Get your key from Google AI Studio.",
         )
-        use_streaming = st.toggle("Stream output", value=True)
-        if provider == "Gemini":
-            st.caption("Gemini runs in non-streaming mode in this app.")
+        use_streaming = False
+        st.caption("Gemini runs in non-streaming mode in this app.")
         st.markdown("### Input Tips")
         st.markdown(
             """
@@ -1073,52 +1070,13 @@ def render_upload_page(provider, model, api_key, use_streaming):
 
     with content_col:
         st.markdown('<div class="workspace-shell">', unsafe_allow_html=True)
-        with st.container(border=True):
-            st.markdown("### Model Configuration")
-            cfg_col1, cfg_col2 = st.columns(2)
-            with cfg_col1:
-                visible_provider = st.selectbox(
-                    "Provider",
-                    options=["Groq", "Gemini"],
-                    index=0 if provider == "Groq" else 1,
-                    key="visible_provider",
-                )
-            with cfg_col2:
-                visible_model = st.selectbox(
-                    "Model",
-                    options=PROVIDER_MODELS[visible_provider],
-                    index=0,
-                    key="visible_model",
-                    help="Choose the model used for OCR and re-evaluation.",
-                )
-
-            visible_label = "Groq API Key" if visible_provider == "Groq" else "Gemini API Key"
-            visible_placeholder = "gsk_..." if visible_provider == "Groq" else "AIza..."
-            visible_key = st.text_input(
-                visible_label,
-                type="password",
-                placeholder=visible_placeholder,
-                value=api_key_input if "api_key_input" in globals() and api_key_input else "",
-                key="visible_api_key",
-            )
-            visible_streaming = st.toggle(
-                "Stream output",
-                value=use_streaming if visible_provider == "Groq" else False,
-                disabled=visible_provider == "Gemini",
-                key="visible_streaming",
-            )
-            if visible_provider == "Gemini":
-                st.caption("Gemini runs in non-streaming mode in this app.")
-
-            provider = visible_provider
-            model = visible_model
-            use_streaming = visible_streaming if provider == "Groq" else False
-            if visible_key:
-                api_key = visible_key.strip()
-            elif provider == "Gemini":
-                api_key = os.environ.get("GEMINI_API_KEY", "")
-            else:
-                api_key = os.environ.get("GROQ_API_KEY", "")
+        provider = "Gemini"
+        model = "gemini-2.5-flash"
+        use_streaming = False
+        if api_key_input:
+            api_key = api_key_input.strip()
+        else:
+            api_key = os.environ.get("GEMINI_API_KEY", "")
 
         st.markdown(
             """
@@ -1162,45 +1120,20 @@ def render_upload_page(provider, model, api_key, use_streaming):
 
             if st.button("Run Recognition", use_container_width=True):
                 if not api_key:
-                    st.error("Enter the API key for the selected provider before running the model.")
+                    st.error("Enter your Gemini API key before running the model.")
                 else:
                     try:
                         with st.spinner("Analyzing handwriting..."):
                             prompt = build_recognition_prompt(image_bytes)
-                            if use_streaming and provider == "Groq":
-                                placeholder = st.empty()
-                                full_text = ""
-                                completion = run_multimodal_text(
-                                    provider,
-                                    api_key,
-                                    model,
-                                    prompt,
-                                    image_bytes,
-                                    mime_type,
-                                    streaming=True,
-                                )
-                                for chunk in completion:
-                                    delta = chunk.choices[0].delta.content or ""
-                                    full_text += delta
-                                    safe_text = html.escape(full_text + "|")
-                                    placeholder.markdown(
-                                        f'<div class="result-text">{safe_text}</div>',
-                                        unsafe_allow_html=True,
-                                    )
-                                placeholder.markdown(
-                                    f'<div class="result-text">{html.escape(full_text)}</div>',
-                                    unsafe_allow_html=True,
-                                )
-                            else:
-                                full_text = run_multimodal_text(
-                                    provider,
-                                    api_key,
-                                    model,
-                                    prompt,
-                                    image_bytes,
-                                    mime_type,
-                                    streaming=False,
-                                )
+                            full_text = run_multimodal_text(
+                                provider,
+                                api_key,
+                                model,
+                                prompt,
+                                image_bytes,
+                                mime_type,
+                                streaming=False,
+                            )
 
                         st.session_state["last_result"] = full_text
                         st.session_state["last_file"] = uploaded_file.name
@@ -1212,7 +1145,7 @@ def render_upload_page(provider, model, api_key, use_streaming):
                     except Exception as exc:
                         update_dashboard_after_run(uploaded_file.name, len(image_bytes), "Error")
                         st.error(f"Recognition failed: {exc}")
-                        st.caption("Check the API key and verify the selected model is available.")
+                        st.caption("Check your Gemini API key and verify the selected model is available.")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1290,7 +1223,7 @@ def render_upload_page(provider, model, api_key, use_streaming):
 
                 if submit_feedback:
                     if not api_key:
-                        st.error("Enter the API key for the selected provider before running re-evaluation.")
+                        st.error("Enter your Gemini API key before running re-evaluation.")
                     elif not st.session_state.get("uploaded_image_bytes"):
                         st.error("Please upload and process an image before re-evaluating the transcription.")
                     elif not feedback.strip():
