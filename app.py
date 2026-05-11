@@ -533,9 +533,8 @@ PROVIDER_MODELS = {
         "meta-llama/llama-4-scout-17b-16e-instruct",
     ],
     "Gemini": [
-        "gemini-2.5-pro",
-        "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
     ],
 }
 
