@@ -1074,6 +1074,53 @@ def render_upload_page(provider, model, api_key, use_streaming):
 
     with content_col:
         st.markdown('<div class="workspace-shell">', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("### Model Configuration")
+            cfg_col1, cfg_col2 = st.columns(2)
+            with cfg_col1:
+                visible_provider = st.selectbox(
+                    "Provider",
+                    options=["Groq", "Gemini"],
+                    index=0 if provider == "Groq" else 1,
+                    key="visible_provider",
+                )
+            with cfg_col2:
+                visible_model = st.selectbox(
+                    "Model",
+                    options=PROVIDER_MODELS[visible_provider],
+                    index=0,
+                    key="visible_model",
+                    help="Choose the model used for OCR and re-evaluation.",
+                )
+
+            visible_label = "Groq API Key" if visible_provider == "Groq" else "Gemini API Key"
+            visible_placeholder = "gsk_..." if visible_provider == "Groq" else "AIza..."
+            visible_key = st.text_input(
+                visible_label,
+                type="password",
+                placeholder=visible_placeholder,
+                value=api_key_input if "api_key_input" in globals() and api_key_input else "",
+                key="visible_api_key",
+            )
+            visible_streaming = st.toggle(
+                "Stream output",
+                value=use_streaming if visible_provider == "Groq" else False,
+                disabled=visible_provider == "Gemini",
+                key="visible_streaming",
+            )
+            if visible_provider == "Gemini":
+                st.caption("Gemini runs in non-streaming mode in this app.")
+
+            provider = visible_provider
+            model = visible_model
+            use_streaming = visible_streaming if provider == "Groq" else False
+            if visible_key:
+                api_key = visible_key.strip()
+            elif provider == "Gemini":
+                api_key = os.environ.get("GEMINI_API_KEY", "")
+            else:
+                api_key = os.environ.get("GROQ_API_KEY", "")
+
         st.markdown(
             """
             <div class="upload-card">
