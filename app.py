@@ -211,6 +211,7 @@ st.markdown(
             line-height: 1.08;
             font-weight: 800;
             letter-spacing: -0.04em;
+            color: var(--primary-strong);
             margin: 0 auto;
             max-width: 720px;
         }
