@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -30,6 +31,11 @@ st.set_page_config(
 
 DATA_FILE = Path("dashboard_data.json")
 MEMORY_FILE = Path("transcription_memory.json")
+INDIA_TZ = ZoneInfo("Asia/Kolkata")
+
+
+def india_now():
+    return datetime.now(INDIA_TZ)
 
 
 st.markdown(
@@ -633,7 +639,7 @@ def remember_correction(file_name, image_bytes, prior_text, feedback, corrected_
             "previous_text": prior_text,
             "feedback": feedback,
             "corrected_text": corrected_text,
-            "saved_at": datetime.now().isoformat(),
+            "saved_at": india_now().isoformat(),
         }
     )
     memory_data["entries"] = memory_data["entries"][-25:]
@@ -642,8 +648,8 @@ def remember_correction(file_name, image_bytes, prior_text, feedback, corrected_
 
 def update_dashboard_after_run(file_name, file_size_bytes, status):
     data = load_dashboard_data()
-    processed_at = datetime.now()
-    processed_time = datetime.now().strftime("%I:%M %p").lstrip("0")
+    processed_at = india_now()
+    processed_time = processed_at.strftime("%I:%M %p IST").lstrip("0")
     size_label = f"{file_size_bytes / (1024 * 1024):.1f} MB"
 
     data["recent_documents"].insert(
@@ -1138,7 +1144,7 @@ def render_upload_page(provider, model, api_key, use_streaming):
 
                         st.session_state["last_result"] = full_text
                         st.session_state["last_file"] = uploaded_file.name
-                        st.session_state["last_timestamp"] = datetime.now().strftime("%H:%M:%S")
+                        st.session_state["last_timestamp"] = india_now().strftime("%H:%M:%S IST")
                         st.session_state["reevaluate_mode"] = False
                         st.session_state["reevaluate_feedback"] = ""
                         update_dashboard_after_run(uploaded_file.name, len(image_bytes), "Completed")
@@ -1195,7 +1201,7 @@ def render_upload_page(provider, model, api_key, use_streaming):
                 st.download_button(
                     label="Download Transcription",
                     data=result_text,
-                    file_name=f"transcription_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                    file_name=f"transcription_{india_now().strftime('%Y%m%d_%H%M%S')}.txt",
                     mime="text/plain",
                     use_container_width=True,
                 )
@@ -1256,7 +1262,7 @@ def render_upload_page(provider, model, api_key, use_streaming):
                                 review_result,
                             )
                             st.session_state["last_result"] = review_result
-                            st.session_state["last_timestamp"] = datetime.now().strftime("%H:%M:%S")
+                            st.session_state["last_timestamp"] = india_now().strftime("%H:%M:%S IST")
                             st.session_state["reevaluate_mode"] = False
                             st.session_state["reevaluate_feedback"] = ""
                             st.success("Re-evaluation completed using your feedback and saved memory.")
