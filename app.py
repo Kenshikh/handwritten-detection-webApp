@@ -685,6 +685,35 @@ def update_dashboard_after_run(file_name, file_size_bytes, status):
     DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+def report_reevaluation_error(file_name, file_size_bytes=0):
+    data = load_dashboard_data()
+    reported_at = india_now()
+    reported_time = reported_at.strftime("%I:%M %p IST").lstrip("0")
+    size_label = f"{file_size_bytes / (1024 * 1024):.1f} MB" if file_size_bytes else "-"
+
+    data["recent_documents"].insert(
+        0,
+        {
+            "document": file_name,
+            "size": size_label,
+            "status": "Reported Error",
+            "processed_time": reported_time,
+            "processed_at": reported_at.isoformat(),
+        },
+    )
+    data["recent_documents"] = data["recent_documents"][:6]
+
+    data["recent_activity"].insert(
+        0,
+        {"message": f"Reported OCR issue for {file_name}", "time": reported_time},
+    )
+    data["recent_activity"] = data["recent_activity"][:6]
+
+    data["stats"]["errors"] += 1
+
+    DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 def encode_image_to_base64(image_bytes: bytes) -> str:
     return base64.b64encode(image_bytes).decode("utf-8")
 
@@ -1207,6 +1236,10 @@ def render_upload_page(provider, model, api_key, use_streaming):
                 )
             with action_right:
                 if st.button("Re-evaluate Transcription", use_container_width=True):
+                    report_reevaluation_error(
+                        st.session_state.get("last_file", "Uploaded image"),
+                        len(st.session_state.get("uploaded_image_bytes") or b""),
+                    )
                     st.session_state["reevaluate_mode"] = True
             st.markdown("</div>", unsafe_allow_html=True)
 
